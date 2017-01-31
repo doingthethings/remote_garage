@@ -1,5 +1,3 @@
-#include <ESP8266WiFi.h>
-#include <LiquidCrystal_I2C.h>
 #include <ESP8266WiFi.h>          //https://github.com/esp8266/Arduino
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
@@ -7,16 +5,10 @@
 #include <Ticker.h> //for LED status
 
 Ticker ticker;
+#define TRIGGER_PIN 16
 
-#define TRIGGER_PIN 0
-#define WIFIRESET_PIN 2
-
-String door1status = "open";
-String door2status = "open";
-
-int ledPin_d5 = 14; // GPIO14
-int ledPin_d6 = 12; // GPIO12
-int ledPin_d7 = 13; // GPIO13
+int door1_trigger_pin = 14; // GPIO14
+int door2_trigger_pin = 12; // GPIO12
 
 int door1_sensor_pin = 4;
 int door2_sensor_pin = 5;
@@ -24,13 +16,15 @@ int door2_sensor_pin = 5;
 int door1_state = 0;
 int door2_state = 0;
 
-int door1_condition = 1;
-int door2_condition = 1;
+
+long buttonTimer = 0;
+long longPressTime = 5000;
+
+boolean buttonActive = false;
+boolean longPressActive = false;
+
 
 WiFiServer server(80);
-
-//LiquidCrystal_I2C lcd(0x3F, 16, 2);
-
 
 
 void tick()
@@ -40,19 +34,16 @@ void tick()
   digitalWrite(BUILTIN_LED, !state);     // set pin to the opposite state
 }
 
-void check_for_reset()
+void reset_wifi_config()
 {
-  if ( digitalRead(WIFIRESET_PIN) == LOW ) {
       WiFiManager wifiManager;
       wifiManager.resetSettings();
       Serial.println("Resetting!");
       ESP.restart();
-    }
 }
 
-void check_for_ondemand()
+void on_demand_wifi()
 {
-    if ( digitalRead(TRIGGER_PIN) == LOW ) {
     ticker.attach(0.2, tick);
     //WiFiManager
     //Local intialization. Once its business is done, there is no need to keep it around
@@ -67,9 +58,34 @@ void check_for_ondemand()
     }
     Serial.println("connected...yeey :)");
     ticker.detach();
-  } 
+
 }
 
+void check_for_button()
+{
+  if (digitalRead(TRIGGER_PIN) == HIGH) {
+    if (buttonActive == false) {
+      buttonActive = true;
+      buttonTimer = millis();
+    }
+    if ((millis() - buttonTimer > longPressTime) && (longPressActive == false)) {
+      //Code for the long press
+      longPressActive = true;
+      reset_wifi_config();
+    }
+  } else {
+    if (buttonActive == true) {
+      if (longPressActive == true) {
+        longPressActive = false;
+      } else {
+        //Code for the short press
+      on_demand_wifi();
+      }
+      buttonActive = false;
+    }
+  }
+}
+ 
 
 //gets called when WiFiManager enters configuration mode
 void configModeCallback (WiFiManager *myWiFiManager) {
@@ -85,17 +101,6 @@ void configModeCallback (WiFiManager *myWiFiManager) {
 void setup() {
   Serial.begin(115200);
   delay(10);
-
-  //lcd.begin(16,2);
-  //lcd.init();
-
-  // Turn on the backlight.
-  //lcd.backlight();
-  //lcd.setCursor(0, 0);
-  //lcd.print("Open Garage");
-  //lcd.setCursor(0, 1);      
-  //lcd.print("Connecting Wifi");
-  //delay(2000);
 
   pinMode(TRIGGER_PIN, INPUT);
   
@@ -134,12 +139,12 @@ void setup() {
   pinMode(door1_sensor_pin, INPUT);
   pinMode(door2_sensor_pin, INPUT);
  
-  pinMode(ledPin_d5, OUTPUT);
-  pinMode(ledPin_d6, OUTPUT);
-  pinMode(ledPin_d7, OUTPUT);
-  digitalWrite(ledPin_d5, LOW);
-  digitalWrite(ledPin_d6, LOW);
-  digitalWrite(ledPin_d7, LOW);
+  pinMode(door1_trigger_pin, OUTPUT);
+  pinMode(door2_trigger_pin, OUTPUT);
+ 
+  digitalWrite(door1_trigger_pin, LOW);
+  digitalWrite(door2_trigger_pin, LOW);
+
  
 
 
@@ -169,8 +174,8 @@ void setup() {
  
 void loop() {
 
-  check_for_ondemand();
-  check_for_reset();
+  check_for_button();
+  //check_for_reset();
 
 
 
@@ -193,23 +198,17 @@ void loop() {
   //Serial.println(request);
   client.flush();
 
-
-
- 
-
-
-
   // Match the request
-  if (request.indexOf("/LED=d5press") != -1)  {
-    digitalWrite(ledPin_d5, HIGH);
+  if (request.indexOf("/trigger=door1") != -1)  {
+    digitalWrite(door1_trigger_pin, HIGH);
     delay(300);
-    digitalWrite(ledPin_d5, LOW);
+    digitalWrite(door1_trigger_pin, LOW);
   }
  
-  if (request.indexOf("/LED=d6press") != -1)  {
-    digitalWrite(ledPin_d6, HIGH);
+  if (request.indexOf("/trigger=door2") != -1)  {
+    digitalWrite(door2_trigger_pin, HIGH);
     delay(300);
-    digitalWrite(ledPin_d6, LOW);
+    digitalWrite(door2_trigger_pin, LOW);
   }
 
   if (request.indexOf("/checkstatus") != -1)  {
@@ -225,8 +224,8 @@ void loop() {
   client.println("<!DOCTYPE HTML>");
   client.println("<html>");
 
-  client.println("<a href=\"/LED=d5press\"\"><button>Open Door 1</button></a><br />");
-  client.println("<a href=\"/LED=d6press\"\"><button>Open Door 2</button></a><br />");
+  client.println("<a href=\"/trigger=door1\"\"><button>Trigger Door 1</button></a><br />");
+  client.println("<a href=\"/trigger=door2\"\"><button>Trigger Door 2</button></a><br />");
   client.println("<a href=\"/checkstatus\"\"><button>Check Door Status</button></a><br />");
 
 
@@ -236,11 +235,8 @@ void loop() {
 
 
 
-  //if (door1_condition != door1_state){
-    if (door1_state == HIGH) {
+    if (door1_state == LOW) {
       Serial.println("Door 1 open");
-      //lcd.setCursor(0, 0);
-      //lcd.print("Door 1: Open    ");
       client.println("Door1 is now: Open <br />");
     } else {
       Serial.println("Door 1 closed");   
@@ -248,14 +244,8 @@ void loop() {
       //lcd.print("Door 1: Closed  ");
       client.println("Door1 is now: Closed <br />");
     }
-    //door1_condition = door1_state;
-  //}
-      
 
-
-
-  //if (door2_condition != door2_state){
-    if (door2_state == HIGH) {
+    if (door2_state == LOW) {
       Serial.println("Door 2 open");
       //lcd.setCursor(0, 1);
       //lcd.print("Door 2: Open    ");
@@ -266,8 +256,6 @@ void loop() {
       //lcd.print("Door 2: Closed  ");
       client.println("Door2 is now: Closed <br />");
     }
-      //door2_condition = door2_state;
- // }
  
   
   client.println("</html>");
