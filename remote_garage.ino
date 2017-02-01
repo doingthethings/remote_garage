@@ -157,18 +157,6 @@ void setup() {
   Serial.print("http://");
   Serial.print(WiFi.localIP());
   Serial.println("/");
-  //lcd.clear();
-  //lcd.setCursor(0, 0);
-  //lcd.print("IP ADDRESS:");
-  //lcd.setCursor(0, 1);      
-  //lcd.print(WiFi.localIP());
-  //delay(2000);
-
-  //lcd.clear();
-  //lcd.setCursor(0, 0);
-  //lcd.print("Door 1: Checking");
-  //lcd.setCursor(0, 1);      
-  //lcd.print("Door 2: Checking");
  
 }
  
@@ -222,39 +210,33 @@ void loop() {
   client.println("Content-Type: text/html");
   client.println(""); //  do not forget this one
   client.println("<!DOCTYPE HTML>");
-  client.println("<html>");
+  client.println("<html -webkit-text-size-adjust: 100%;>");
+  
+  client.println("<a href=\"/trigger=door1\"\"><button style=\"font-size:100px;height:500px;width:470px\">Trigger <br> Door 1</button></a>");
+  client.println("<a href=\"/trigger=door2\"\"><button style=\"font-size:100px;height:500px;width:470px\">Trigger <br> Door 2</button></a><br /><br />");
+  client.println("<a href=\"/checkstatus\"\"><button style=\"font-size:40px;height:200px;width:940px\">Check Door Status</button></a><br />");
 
-  client.println("<a href=\"/trigger=door1\"\"><button>Trigger Door 1</button></a><br />");
-  client.println("<a href=\"/trigger=door2\"\"><button>Trigger Door 2</button></a><br />");
-  client.println("<a href=\"/checkstatus\"\"><button>Check Door Status</button></a><br />");
-
+  //client.println("<body -webkit-text-size-adjust: 100%;></body>");
 
   door1_state = digitalRead(door1_sensor_pin);
   door2_state = digitalRead(door2_sensor_pin);
 
 
 
-
-    if (door1_state == LOW) {
+    if (door1_state == HIGH) {
       Serial.println("Door 1 open");
-      client.println("Door1 is now: Open <br />");
+      client.println("<font size=\"100\" color=red>Door1 is now: Open</font><br />");
     } else {
       Serial.println("Door 1 closed");   
-      //lcd.setCursor(0, 0);
-      //lcd.print("Door 1: Closed  ");
-      client.println("Door1 is now: Closed <br />");
+      client.println("<font size=\"100\" color=green>Door1 is now: Closed</font><br />");
     }
 
-    if (door2_state == LOW) {
+    if (door2_state == HIGH) {
       Serial.println("Door 2 open");
-      //lcd.setCursor(0, 1);
-      //lcd.print("Door 2: Open    ");
-      client.println("Door2 is now: Open <br />");
+      client.println("<font size=\"100\" color=red>Door2 is now: Open</font><br />");
     } else {
       Serial.println("Door 2 closed");
-      //lcd.setCursor(0, 1);
-      //lcd.print("Door 2: Closed  ");
-      client.println("Door2 is now: Closed <br />");
+      client.println("<font size=\"100\" color=green>Door2 is now: Closed</font><br />");
     }
  
   
